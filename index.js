@@ -65,10 +65,71 @@ app.post('/api/data', async (req, res) => {
   }
 
 });
-  
+
+app.get('/api/features', async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  let perPage = parseInt(req.query.per_page) || 10;
+  perPage = Math.min(perPage, 1000);
+
+  const magType = req.query.mag_type;
+
+  try {
+    let query = `
+      SELECT * FROM public.feature_details
+    `;
+
+    if (magType) {
+      query += ` WHERE mag_type = '${magType}'`;
+    }
+
+    const countQuery = `SELECT COUNT(*) FROM feature_details`;
+    const countResult = await client.query(countQuery);
+    const totalCount = parseInt(countResult.rows[0].count);
+    
+    query += `
+      ORDER BY id
+      OFFSET $1
+      LIMIT $2
+    `;
+
+    const queryResult = await client.query(query, [(page - 1) * perPage, perPage]);
+
+    const data = queryResult.rows.map(row => ({
+      id: row.id,
+      type: row.type,
+      attributes: {
+        external_id: row.external_id,
+        magnitude: row.magnitude,
+        place: row.place,
+        time: row.time.toISOString(),
+        tsunami: row.tsunami,
+        mag_type: row.mag_type,
+        title: row.title,
+        coordinates: {
+          longitude: row.longitude,
+          latitude: row.latitude
+        }
+      },
+      links: {
+        external_url: row.url
+      }
+    }));
+
+    res.json({
+      data: data,
+      pagination: {
+        current_page: page,
+        total: totalCount,
+        per_page: perPage
+      }
+    });
+  } catch (error) {
+    console.error('Error al obtener datos:', error);
+    res.status(500).send('Error al obtener datos');
+  }
+});
 
 const PORT = 3000;
-
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
