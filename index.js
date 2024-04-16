@@ -129,6 +129,37 @@ app.get('/api/features', async (req, res) => {
   }
 });
 
+app.post('/api/features/:featureId/comments', async (req, res) => {
+  try {
+    const featureId = req.params.featureId;
+    const commentBody = req.body.body;
+
+    if (!commentBody) {
+      return res.status(400).json({ error: 'El body del comentario es obligatorio.' });
+    }
+
+    const result = await client.query(`
+      INSERT INTO comment_feature (feature_id, comment)
+      VALUES ($1, $2)
+      RETURNING *
+    `, [featureId, commentBody]);
+
+    if (result.rows.length > 0) {
+      const createdComment = result.rows[0];
+      return res.status(201).json({
+        commentId: createdComment.id,
+        featureId: createdComment.feature_id,
+        message: 'El comentario se ha creado exitosamente.'
+      });
+    } else {
+      return res.status(500).json({ error: 'Error al crear el comentario.' });
+    }
+  } catch (error) {
+    console.error('Error al crear el comentario:', error);
+    return res.status(500).json({ error: 'Error interno del servidor.' });
+  }
+});
+
 const PORT = 3000;
 
 app.listen(PORT, () => {
